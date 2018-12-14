@@ -66,7 +66,7 @@ A Reinforcement Learning Approach  for Rebalancing Vehicles in Autonomous Mobi
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{abstract}
 
-This paper presents an approach to rebalance vehicles in Autonomous Mobility-on-Demand systems (AMoD) through a learning and a rebalancing stage. In the learning stage, we use reinforcement learning on historical to approximate the values of each autonomous vehicle's actions. Then in the rebalancing stage, we use these values to find advantageous rebalancing actions in real-time for each available vehicle. We test this approach on real customer data from Didi Chuxing: we show that the computational complexity of this approach does not increase with the number of stations in the system, however, sacrificing [TO DO: insert result] in performance compared with a reactive real-time rebalancing strategy.  
+This paper presents an approach to rebalance vehicles in Autonomous Mobility-on-Demand systems (AMoD) through a learning and a rebalancing stage. In the learning stage, we use reinforcement learning on historical data to approximate the values of each autonomous vehicle's actions. Then in the rebalancing stage, we use these values to find advantageous rebalancing actions in real-time for each available vehicle. We test this approach on real customer data from Didi Chuxing: we show that the computational complexity of this approach does not increase with the number of stations in the system, however, sacrificing 10 times of performance compared with a reactive real-time rebalancing strategy.  
 
 \end{abstract}
 
@@ -74,25 +74,35 @@ This paper presents an approach to rebalance vehicles in Autonomous Mobility-on-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 
-As our cities grow rapidly everyday, transportation becomes a challenge for many urban dwellers. Among many future mobility systems, autonomous mobility on demand (AMoD) is deemed one of the most promising modes of transportation. [TO DO: COMPLETE INTRODCUTION for A. LITERATURE, B. MOTIVATION AND C. STATEMENT OF WORK]
+As our cities grow rapidly everyday, transportation becomes a challenge for many urban dwellers. Among many future mobility systems, mobility-on-demand (MoD) is deemed one of the most promising modes of transportation. Together, MoD and autonomous vehicles form the mobility system of Autonomous Mobility-on-Demand (AMoD), where passengers drive vehicles to destinations, and vehicles autonomously rebalance, or disperse into the system to address future demands. Rebalancing therefore becomes crucial in AMoD in order to avoid unwanted concentration of idling vehicles in popular drop-off locations. 
 
 \subsection{Literature}
+A large amount of research has been produced in using optimization techniques to find optimal rebalancing strategies of MoD systems. However, to the best of our knowledge, all of the existing rebalancing strategies using optimization suffer from the problem of scalability. \cite{Zhang.ea:Reactive} approaches the problem by formulating it as an linear integer optimization problem, thereby rebalancing vehicles with a reactive real-time policy. \cite{Iglesias.ea:MPC} develops a model predictive control (MPC) algorithm that shows promising results, while incorporating demand forecasts into its input. However, \cite{Zhang.ea:Reactive} and \cite{Iglesias.ea:MPC} both face the problem of computational complexity growing with the size of the system. The problem size of \cite{Zhang.ea:Reactive} is an increasing function of the number of stations, or nodes, in the MoD system. On the other hand, the problem size of \cite{Iglesias.ea:MPC} is an increasing function of both the number of stations and the length of the planning horizon.
+\cite{Tsao.ea:Stochastic} tackles the problem of scalability as it presents a controller that outperforms \cite{Iglesias.ea:MPC} using a stochastic MPC algorithm that incorporated demand uncertainty. The best-performing variant of the algorithm sacrificed some performance to be more scalable, making its problem size an increasing function of the number of samples in its Sample Average Approximations method, which reduces complexity, but still, could face a large problem size depending on the scenario. 
+
+There has also been work addressing rebalancing or similar problems using reinforcement learning. \cite{Rahili.ea:Caltech},\cite{Gueriau.ea:Decentralized},\cite{Wen.ea:SharedMoDRL} and \cite{Lin.ea:DidiFleetManagement} implemented RL in an end-to-end fashion to solve problems that closely resemble vehicle rebalancing. Although each incorporated different modeling assumptions and RL algorithms, their problem size scales with fleet size. Furthermore, these approaches only provide their vehicles local information concerning the vehicles themselves. This assumption shrinks the state-space of the RL problem significantly, but cannot take in the advantage of having a fully autonomous system.
+
+In order to optimize matches between driver and customer order in a ride-hailing service, \cite{Xu.ea:DidiDispatch} introduced an algorithm that involves 1) an offline learning step that uses historical data and reinforcement learning to estimate expected value of a driver in a state and store those values in a look up table, and 2) an online planning step that takes the value functions, and uses optimization algorithm (KM algorithm) to find best matches. However, \cite{Xu.ea:DidiDispatch} also only provide each vehicle with local information. This paper extends upon \cite{Xu.ea:DidiDispatch}'s idea, learning values from historical data in order to make rebalancing a more computationally feasible problem, while providing each vehicles both global and local information of the system, so that they can make more informed decisions.
 
 \subsection{Motivation of proposed work} 
+Due to the above-mentioned limitations in existing work, to the best of our knowledge, there is no existing approach to rebalance vehicles that 1) achieves scalability so that the computational complexity of rebalancing will not grow as a function of number of stations and vehicles, and 2) provides each vehicle with global information. This paper therefore proposes an approach to tackle these challenges.  
 
 \subsection{Statement of work} 
+The contributions of this paper are threefold. First, we develop an approach to model the problem as a Markov-Decision Process (MDP) and divide the problem into two sub-problems: a learning stage and a rebalancing stage. Second, we propose an algorithm to solve each sub-problem. In the learning stage, our algorithm aims to accurately produce estimates of state-action values through learning on historical data. In the rebalancing stage, our algorithm leverages the learned values to rebalance vehicles in real-time. Third, we validate the approach by performing an experiment using a dataset of Didi Chuxing, while comparing with the performance of the controller in \cite{Zhang.ea:Reactive} on the same dataset. Our approach shows a significant decrease in performance, but a reduction in computational complexity. 
 
-
-\includegraphics[scale=0.8]{procedure.png}
-Fig. 1. Illustration of the proposed approach.
-
+\begin{figure}[thpb]
+      \centering
+      \includegraphics[scale=0.7]{procedure.png}
+      \caption{Illustration of the proposed approach.}
+      \label{figurelabel}
+\end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Problem formulation}
 \subsection{Background Information}
 Consider an environment discretized into a set of $\mathcal{N}$ stations (also can be viewed as discretized regions, as in [1]). Time is presented in discrete intervals of unit time $1$. The furthest time that will be considered is denoted as $T$.
 
-Furthermore, let $M$ denote the total number of vehicles. Let $v^e_i$ denote the difference between the number of vehicles at or arriving at station $i$, and the number of passengers preparing to board an available vehicle at station $i$.[ TO DO: cite reactive paper]. Note that we assume that the vehicles arrive deterministically, or that no uncertainty is taken into account for travel times between two stations. 
+Furthermore, let $M$ denote the total number of vehicles. Let $v^e_i$ denote the difference between the number of vehicles at or arriving at station $i$, and the number of passengers preparing to board an available vehicle at station $i$, as stated in \cite{Zhang.ea:Reactive}. Note that we assume that the vehicles arrive deterministically, or that no uncertainty is taken into account for travel times between two stations. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{MDP Model Description}
@@ -104,7 +114,7 @@ At every time step $t \in \{1,...,T-1,T\}$, a MDP, an \textit{agent} observes th
 
 \noindent \textit{Action, $a_t$}: An agent is only made to choose an action when it is idle. Consider an idle agent currently at station $i$. Its action is defined as $j$, where $j\in \mathcal{N}$. If $i = j$, then the agent remains idle at its current station. If $i \neq j$, the agent departs to go to station $j$. The dimension of the action space is therefore $\mathcal{N}$. \\
 
-\noindent \textit{Reward, $r_t$}: The reward is equal to the average customer wait time at time $t$. [TO DO: DEFINE FINAL REWARD DEFINITION] \\ 
+\noindent \textit{Reward, $r_t$}: The reward is equal to the reduction in average customer wait time at time $t$, compared to that at time $t-1$. \\ 
 
 Lastly, from classical MDP definitions, we define the state-action value, $Q(s,a)$ as the expected utility if following an action $a$ from state $t$.
 
@@ -119,7 +129,7 @@ where $\textbf{w}$ is the weight matrix, and $x_t$ is the state vector $s_t$ plu
 At each time step, we use new information in this time step to improve our prediction. The objective of the learning stage can therefore be formally written as:
 
 \begin{equation}
-    \min J(s_t,a_t;\textbf{w}) = [Q(s_t,a_t;\textbf{w}) - (r_t+\gamma  Q(s_{t+1},a_{t+1};\textbf{w}))]^2
+    \min J = [Q(s_t,a_t;\textbf{w}) - (r_t+\gamma  Q(s_{t+1},a_{t+1};\textbf{w}))]^2
 \end{equation}
 where $\gamma$ is the future reward discount factor, which is adjustable parameter.\\
 
@@ -136,9 +146,124 @@ where $Q^m(s_t,a_t;\textbf{w})$ is the state-action value corresponding to vehic
 
 \section{Proposed Solution}
 \subsection{Learning Stage}
-Due to the large size of the state-space, we will use the SARSA with value-function approximation (VFA) algorithm to approximate the state-action values. Each vehicle at each time step is a data point that the algorithm use to update the weight matrix. To do this, vehicles' actions are performed sequentially. We create smaller simulated states, $\hat{s}_t$ that are updated every time a vehicle has been assigned an action. The algorithm is as follows:
+Due to the large size of the state-space, we will use the SARSA with value-function approximation (VFA) algorithm to approximate the state-action values. Each vehicle at each time step is a data point that the algorithm use to update the weight matrix. The algorithm is as follows:
 \begin{algorithm}[H]
 \caption{Learning Stage: SARSA with VFA}
+\begin{algorithmic}
+\For{each ($s_t,a_t,r_t,s_{t+1},a_{t+1}$)}
+    \State $Q_{target} = r_t+\gamma  Q(s_{t+1},a_{t+1})$
+    \State  $Q_{prediction} = Q(s_t,a_t)$
+    \State J = $(Q_{prediction} - Q_{target})^2$
+    \State $\textbf{w} \leftarrow \textbf{w} - \alpha \nabla_{ \textbf{w}} J$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+In this algorithm, we parameterize state-action values as a function of state, action and a weight matrix, in order to predict the values for unseen states as well. The algorithm approaches convergence as the objective in (1) is met.
+
+\subsection{Rebalancing Stage}
+In the rebalancing stage, we find the global optimum by assigning actions probabilistically for each vehicle. The algorithm follows: 
+\begin{algorithm}[H]
+\caption{Rebalancing Stage: Probabilistically Performing Actions}
+\begin{algorithmic}
+\For{each time step $t \in {0,1,...,T}$}
+    \For{each vehicle $m$}
+        \If {vehicle is idle}
+            \State $P_j = \frac{Q(s_t,j)}{\sum_a Q(s_t,a)}$
+            \State $a_t^m \leftarrow j$ with probability $P_j$
+        \EndIf
+    \EndFor
+    \State\textbf{Assign} $\{a^1_t,a^2_t,...,a^M_t\}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+Under any state, actions with higher values have higher probabilities of being taken. The total distribution of vehicles' rebalancing actions should therefore be approximately the distribution of values corresponding to those actions. 
+
+Although this algorithm loops around each vehicle, the actions of each vehicle can be done simutaneously in reality, since their actions are based on pre-determined probabilities. The time complexity at each time step is therefore only to perform a matrix multiplication of $\textbf{w}x_t$.
+
+\section{Numerical Experiments}
+In this section, we conduct experiment with the Didi Chuxing dataset, which consists of 330,380 customer orders spanning 24 hours and 66 stations. 
+
+\subsection{Simulation Environment}
+We simulate the AMoD system using customer orders from the Didi dataset, which is analogous to customer demand in AMoD. The customer orders include origin and destination stations. Distances between stations are given and are edges between nodes, and speed of vehicles are assumed to be constant. Congestion is not taken into consideration. Every $\Delta t = 6$ minutes, we execute either algorithm(1) or (2), depending on whether we are learning or rebalancing with learned values. 
+
+\subsection{Results}
+For implementation, we first run algorithm (1) for the learning stage on the 24-hour Didi data to train. Then, we take the weight matrix learned in algorithm (1) and use it to output $Q(s,a;\textbf{w}$ in algorithm (2), and run algorithm (2) on the dataset to rebalance vehicles. We refer the results from running algorithm (2) as \textit{RL Rebalancing}. We then compare the performance of algorithm (2) with the performance of the controller in \cite{Zhang.ea:Reactive}, hereafter referred to as \textit{Reactive}. 
+\begin{table}
+\caption{Wait Times for the DiDi Scenario}
+\begin{center}
+\begin{tabular}{ |c|c|c| }
+ \hline
+ Time & Reactive & RL Rebalancing \\ 
+ \hline
+ Mean Wait Time & 276.75 & 2911.60 \\ 
+ Median Wait Time & 72.00 & 1578.00 \\
+ \hline
+\end{tabular}
+\end{center}
+\end{table}
+As seen in Table I, RL Rebalancing underperforms compared to the Reactive controller.\\
+
+\begin{figure}[thpb]
+      \centering
+      \includegraphics[scale=0.18]{custUnassigned.jpg}
+      \caption{Number of customers unassigned}
+      \label{figurelabel}
+\end{figure}
+\begin{figure}[thpb]
+      \centering
+      \includegraphics[scale=0.18]{vehicles.jpg}
+      \caption{Vehicle behaviors}
+      \label{figurelabel}
+\end{figure}
+
+Fig. 2 shows that in RL Rebalancing, a large number of customers are left unassigned. Taking a closer look at the vehicles' behaviors in Fig. 3, we can see that the number of vehicles rebalancing hugely exceeds that in Reactive, while the number of vehicles idling stays low. This means that most vehicles chose the actions of rebalancing, but to places that are not as demanding, therefore not causing them to pick up customers. 
+
+\addtolength{\textheight}{-3cm}   % This command serves to balance the column lengths
+                                  % on the last page of the document manually. It shortens
+                                  % the textheight of the last page by a suitable amount.
+                                  % This command does not take effect until the next page
+                                  % so it should come on the page before the last. Make
+                                  % sure that you do not shorten the textheight too much.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusions}
+\subsection{Conclusions}
+In this paper, we presented a reinforcement learning approach to rebalance vehicles. We first learn to approximate state-action values with historical data, then leverage the approximation to compute values associated with each action under a certain state, thereby being able to take actions corresponding to high values. Experiments based on real-world data show that this approach in application suffer from a great loss in performance, but does provide a solution that is more scalable than other alternatives reviewed. 
+
+\subsection{Future Work}
+As seen in the experiments section, althought theoretically this approach should achieve a good performance given that values are approximated correctly, it is not performing up to standards. More work will need to be done in adjusting state and reward definitions, other tunable parameters, in order to improve performance. 
+
+On the other hand, we could explore whether performance could be improved if taking actions sequentially, therefore maximizing the amount of information each agent can obtain by knowing other agents' actions before it, which could improve the performance of this approach. A proposed algorithm for sequential learning and rebalancing process could be found in the appendix. 
+
+Other future work include addressing the limitations in large state-space. VFA may not be a good approximation since the relationship between $x_t$, the weights $\textbf{w}$ and $Q(s_t,a_t;\textbf{}w)$ may not be linear. Advanced deep learning techniques like deep Q network could be leveraged to approximate large state-space with non-linearity. 
+
+\bibliographystyle{unsrt} 
+\bibliography{Biblio}  
+
+\section*{Appendix}
+\subsection{Derivation of $\nabla_\textbf{w} J$}
+For simplicity of notation, let $s = s_t$,$a = a_t$,$s' = s_{t+1}$,$a' = a_{t+1}$, where $a'$ is derived from a policy (e.g. epsilon-greedy). Let $x$ be the vector of $s$ concatenated with a bias term, and $x'$ be that of $s'$.
+In algorithm (1), we saw that
+\begin{align*}
+    J &= (Q_{target}-Q_{prediction})^2\\
+    &= [Q(s,a;\textbf{w})-(r+\gamma Q(s',a'))]^2
+\end{align*}
+Since $Q(s,a;\textbf{w})=(\textbf{w}x)_a$,
+\begin{align*}
+    J &= (\textbf{w}x)_a-r-\gamma(\textbf{w}x)_a\\
+    &= (\textbf{w}_{a,:} x - r - \gamma \textbf{w}_{a',:}x')^2\\
+    \nabla_\textbf{w}J &= 2(\textbf{w}_{a,:} x - r - \gamma \textbf{w}_{a',:}x')\cdot
+    \begin{cases}
+      x^T, & \text{if}\ a^{th} row \\
+      -\gamma x'^T, & \text{if}\ a'^{th} row\\
+      0, & \text{otherwise}
+    \end{cases}
+\end{align*}
+\subsection{Algorithms for learning and rebalancing sequentially}
+\begin{algorithm}[H]
+\caption{Learning Stage: SARSA with VFA, Sequential}
 \begin{algorithmic}
 \For{each time step $t \in {0,1,...,T}$ }
     \State Observe $\hat{s}_t=s_t$
@@ -148,22 +273,14 @@ Due to the large size of the state-space, we will use the SARSA with value-funct
             \State $\hat{s}_t \leftarrow$ \textbf{simulate} $(a^m_t,s_t)$
         \EndIf
         \State Observe $r_{t-1}$
-        \State $\textbf{w} \leftarrow \textbf{w} - \alpha \nabla_{ \textbf{w}} J(s_{t-1},a_{t-1};\textbf{w})$
+        \State $\textbf{w} \leftarrow \textbf{w} - \alpha \nabla_{ \textbf{w}} J$
     \EndFor
     \State\textbf{Assign} $\{a^1_t,a^2_t,...,a^M_t\}$
 \EndFor
 \end{algorithmic}
 \end{algorithm}
- [TO DO: DEFINE PI. ADD derivation for derivative of J to appendix]
- 
-In this algorithm, we parameterize state-action values as a function of state, action and a weight matrix, in order to predict the values for unseen states as well. The algorithm approaches convergence as the objective in (1) is met.
-
-By creating smaller simulated states and thereby making decisions sequentially, we can take into account of the actions of other agents while an agent performs action.  
-
-\subsection{Rebalancing Stage}
-In the rebalancing stage, we find the global optimum by assigning actions sequentially for each vehicle. The algorithm follows: 
 \begin{algorithm}[H]
-\caption{Rebalancing Stage: Performing Actions}
+\caption{Rebalancing Stage: Sequentially Performing Actions}
 \begin{algorithmic}
 \For{each time step $t \in {0,1,...,T}$}
     \State Observe $\hat{s}_t=s_t$
@@ -177,99 +294,11 @@ In the rebalancing stage, we find the global optimum by assigning actions sequen
 \EndFor
 \end{algorithmic}
 \end{algorithm}
+We create smaller simulated states, $\hat{s_t}$ that are updated every time a vehicle has been assigned an action. By doing this, we should theoretically be able to find the global optimum by assigning actions sequentially for each vehicle. 
 
-\section{Simulation/Experiments}
 
-\addtolength{\textheight}{-3cm}   % This command serves to balance the column lengths
-                                  % on the last page of the document manually. It shortens
-                                  % the textheight of the last page by a suitable amount.
-                                  % This command does not take effect until the next page
-                                  % so it should come on the page before the last. Make
-                                  % sure that you do not shorten the textheight too much.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Conclusions}
-
-\subsection{Conclusions}
-
-\bibliographystyle{unsrt} 
-\bibliography{Biblio}  
-
-\section*{Appendix --- style guidelines}
-
-\subsection{Figures and Tables}
-
-Position figures and tables at the tops and bottoms of columns.
-Avoid placing them in the middle of columns. Large figures and tables
-may span across both columns. Figure captions should be below the figures;
- table captions should be above the tables. Avoid placing figures and tables
-  before their first mention in the text. Use the abbreviation ``Fig. 1'',
-  even at the beginning of a sentence.
-Figure axis labels are often a source of confusion.
-Try to use words rather then symbols. As an example write the quantity ``Inductance",
- or ``Inductance L'', not just.
- Put units in parentheses. Do not label axes only with units.
- In the example, write ``Inductance (mH)'', or ``Inductance L (mH)'', not just ``mH''.
- Do not label axes with the ratio of quantities and units.
- For example, write ``Temperature (K)'', not ``Temperature/K''.
-
-\subsection{Numbering}
-
-Number reference citations consecutively in square brackets \cite{Garcia.ea:Auto89}.
- The sentence punctuation follows the brackets \cite{Garcia.ea:Auto89}.
- Refer simply to the reference number, as in \cite{Garcia.ea:Auto89}.
- Do not use ``ref. \cite{Garcia.ea:Auto89}'' or ``reference \cite{Garcia.ea:Auto89}''.
-Number footnotes separately in superscripts\footnote{This is a footnote}
-Place the actual footnote at the bottom of the column in which it is cited.
-Do not put footnotes in the reference list.
-Use letters for table footnotes (see Table I).
-
-\subsection{Abbreviations and Acronyms}
-
-Define abbreviations and acronyms the first time they are used in the text,
-even after they have been defined in the abstract. Abbreviations such as
-IEEE, SI, CGS, ac, dc, and rms do not have to be defined. Do not use
-abbreviations in the title unless they are unavoidable.
-
-\subsection{Equations}
-
-Number equations consecutively with equation numbers in parentheses flush
- with the right margin, as in (1). To make your equations more compact
- you may use the solidus (/), the exp. function, or appropriate exponents.
-  Italicize Roman symbols for quantities and variables, but not Greek symbols.
-   Use a long dash rather then hyphen for a minus sign. Use parentheses to avoid
-    ambiguities in the denominator.
-Punctuate equations with commas or periods when they are part of a sentence:
-$$\Gamma_2 a^2 + \Gamma_3 a^3 + \Gamma_4 a^4 + ... = \lambda \Lambda(x),$$
-where $\lambda$ is an auxiliary parameter.
-
-Be sure that the symbols in your equation have been defined before the
-equation appears or immediately following.
-Use ``(1),'' not ``Eq. (1)'' or ``Equation (1),''
-except at the beginning of a sentence: ``Equation (1) is ...''.
-
-%\begin{table}
-%\caption{An Example of a Table}
-%\label{table_example}
-%\begin{center}
-%\begin{tabular}{|c||c|}
-%\hline
-%One & Two\\
-%\hline
-%Three & Four\\
-%\hline
-%\end{tabular}
-%\end{center}
-%\end{table}
-
-   \begin{figure}[thpb]
-      \centering
-      %\includegraphics[scale=1.0]{figurefile.jpg}
-      \caption{Inductance of oscillation winding on amorphous
-       magnetic core versus DC bias magnetic field}
-      \label{figurelabel}
-   \end{figure}
+   
 
 
 
